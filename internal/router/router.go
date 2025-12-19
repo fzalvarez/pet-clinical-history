@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	mem "pet-clinical-history/internal/adapters/storage/memory"
+	"pet-clinical-history/internal/domain/accessgrants"
 	"pet-clinical-history/internal/domain/events"
 	"pet-clinical-history/internal/domain/pets"
 	"pet-clinical-history/internal/middleware"
@@ -34,14 +35,18 @@ func NewRouter(opts Options) http.Handler {
 	// Repos in-memory
 	petRepo := mem.NewPetRepo()
 	eventRepo := mem.NewEventRepo()
+	grantsRepo := mem.NewAccessGrantsRepo()
 
 	// Services por módulo
 	petsSvc := pets.NewService(petRepo)
 	eventsSvc := events.NewService(eventRepo)
+	grantsSvc := accessgrants.NewService(grantsRepo)
 
 	// Rutas por módulo
 	pets.RegisterRoutes(r, petsSvc)
-	events.RegisterRoutes(r, eventsSvc, petsSvc)
+	//events.RegisterRoutes(r, eventsSvc, petsSvc) // en el siguiente paso, lo haremos validar delegados
+	events.RegisterRoutes(r, eventsSvc, petsSvc, grantsSvc)
+	accessgrants.RegisterRoutes(r, grantsSvc, petsSvc)
 
 	return r
 }
