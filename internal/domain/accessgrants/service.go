@@ -66,7 +66,62 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 
 	now := s.now()
 
-	// Crear nuevo invite
+	// 1) Buscar si ya existe un grant para (petID, ownerID, granteeID) que NO esté revoked.
+	items, err := s.repo.ListByPet(ctx, petID)
+	if err == nil {
+		var winner Grant
+		hasWinner := false
+		matches := make([]Grant, 0)
+
+		for _, g := range items {
+			if g.PetID != petID || g.OwnerUserID != ownerID || g.GranteeUserID != granteeID {
+				continue
+			}
+			matches = append(matches, g)
+
+			// elegimos el más reciente por UpdatedAt, luego CreatedAt
+			if !hasWinner {
+				winner = g
+				hasWinner = true
+				continue
+			}
+			if g.UpdatedAt.After(winner.UpdatedAt) {
+				winner = g
+				continue
+			}
+			if g.UpdatedAt.Equal(winner.UpdatedAt) && g.CreatedAt.After(winner.CreatedAt) {
+				winner = g
+			}
+		}
+
+		// Si hay winner y NO está revoked: lo “re-invitamos” actualizando scopes (sin crear otro).
+		if hasWinner && winner.ID != "" && winner.Status != StatusRevoked {
+			winner.Scopes = scopes
+			winner.UpdatedAt = now
+
+			if err := s.repo.Update(ctx, winner); err != nil {
+				return Grant{}, err
+			}
+
+			// best-effort: revoca otros matches no revocados para mantener 1 “vigente”
+			for _, g := range matches {
+				if g.ID == "" || g.ID == winner.ID {
+					continue
+				}
+				if g.Status == StatusRevoked {
+					continue
+				}
+				g.Status = StatusRevoked
+				g.UpdatedAt = now
+				g.RevokedAt = &now
+				_ = s.repo.Update(ctx, g)
+			}
+
+			return winner, nil
+		}
+	}
+
+	// 2) Si no hay uno vigente, crea un nuevo invite
 	g := Grant{
 		ID:            uuid.NewString(),
 		PetID:         petID,
@@ -82,7 +137,6 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 	if err := s.repo.Create(ctx, g); err != nil {
 		return Grant{}, err
 	}
-
 	return g, nil
 }
 

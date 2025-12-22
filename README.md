@@ -41,6 +41,24 @@ Para endpoints que operan sobre una mascota (`{petID}`):
 
 ---
 
+## Matriz rápida de permisos (scopes por endpoint)
+
+| Endpoint | Owner | Delegado | Scope requerido |
+|---|---:|---:|---|
+| `GET /pets/{petID}` | ✅ | ✅ | `pet:read` |
+| `PATCH /pets/{petID}` | ✅ | ✅ | `pet:edit_profile` |
+| `GET /me/pets` | — | ✅ | `pet:read` (en grants activos) |
+| `GET /pets/{petID}/events/` | ✅ | ✅ | `events:read` |
+| `POST /pets/{petID}/events/` | ✅ | ✅ | `events:create` |
+| `POST /pets/{petID}/events/{eventID}/void` | ✅ | ✅ | `events:void` |
+| `POST /pets/{petID}/grants/` | ✅ | ❌ | (owner only) |
+| `GET /pets/{petID}/grants/` | ✅ | ❌ | (owner only) |
+| `GET /me/grants/` | — | ✅ | (grantee only) |
+| `POST /grants/{grantID}/accept` | — | ✅ | (grantee only) |
+| `POST /grants/{grantID}/revoke` | ✅ | ❌ | (owner only) |
+
+---
+
 ## Funcionalidades implementadas (MVP)
 
 ### 1) Mascotas (Pets)
@@ -136,7 +154,8 @@ Permite que el owner comparta acceso a una mascota con otro usuario (delegado), 
 - `events:create`
 - `events:void`
 
-> Nota: en la invitación, si se envían scopes vacíos, el servicio puede aplicar defaults mínimos (según implementación).
+> Nota: en la invitación, si se envían scopes vacíos, el servicio puede aplicar defaults mínimos (según implementación).  
+> En la implementación actual, el default mínimo útil permite **ver perfil** y **ver timeline**.
 
 #### Endpoints
 - **Invitar delegado** (owner)
@@ -222,6 +241,7 @@ curl -X POST http://localhost:8080/pets/ ^
   -H "Content-Type: application/json" ^
   -H "X-Debug-User-ID: owner-1" ^
   -d "{\"name\":\"Luna\",\"species\":\"dog\",\"breed\":\"mixed\",\"sex\":\"female\",\"birth_date\":\"2021-04-10\",\"notes\":\"\"}"
+
 
 ### Invitar delegado
 ```bash

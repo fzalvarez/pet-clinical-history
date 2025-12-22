@@ -25,6 +25,7 @@ func RegisterRoutes(r chi.Router, svc *Service, petsSvc *pets.Service, grantsSvc
 	})
 }
 
+// createEventRequest es el cuerpo de la solicitud para registrar un nuevo evento clínico.
 type createEventRequest struct {
 	Type       EventType  `json:"type"`
 	OccurredAt string     `json:"occurred_at"` // RFC3339
@@ -34,6 +35,7 @@ type createEventRequest struct {
 	Visibility Visibility `json:"visibility"` // opcional
 }
 
+// eventResponse representa un evento clínico de la mascota devuelto por la API.
 type eventResponse struct {
 	ID         string      `json:"id"`
 	PetID      string      `json:"pet_id"`
@@ -49,6 +51,22 @@ type eventResponse struct {
 	Status     EventStatus `json:"status"`
 }
 
+// createEventHandler godoc
+// @Summary Crear evento de mascota
+// @Description Crea un nuevo evento clínico para la mascota indicada. El dueño siempre puede crear eventos. Un delegado necesita un grant activo con scope `events:create`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Param payload body createEventRequest true "Datos del evento; occurred_at en formato RFC3339"
+// @Success 201 {object} eventResponse
+// @Failure 400 {string} string "invalid json / occurred_at inválido / reglas de negocio"
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "pet not found"
+// @Router /pets/{petID}/events [post]
 func createEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -110,6 +128,27 @@ func createEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgr
 	}
 }
 
+// listEventsHandler godoc
+// @Summary Listar eventos de una mascota
+// @Description Lista los eventos clínicos de una mascota. El dueño siempre puede verlos. Un delegado necesita un grant activo con scope `events:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod). Permite filtrar por tipos, rango de fechas y texto.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Param limit query int false "Máximo de eventos a devolver (1-200). Por defecto 50"
+// @Param types query string false "Lista CSV de tipos de evento a incluir (ej: MEDICAL_VISIT,BATH)"
+// @Param from query string false "Fecha/hora mínima occurred_at (RFC3339)"
+// @Param to query string false "Fecha/hora máxima occurred_at (RFC3339)"
+// @Param q query string false "Texto de búsqueda libre en título/notas"
+// @Success 200 {array} eventResponse
+// @Failure 400 {string} string "Parámetros de filtro inválidos"
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "pet not found"
+// @Failure 500 {string} string "internal error"
+// @Router /pets/{petID}/events [get]
 func listEventsHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -157,6 +196,22 @@ func listEventsHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgra
 	}
 }
 
+// voidEventHandler godoc
+// @Summary Anular (void) un evento
+// @Description Anula un evento existente de la mascota. El dueño siempre puede anular. Un delegado necesita un grant activo con scope `events:void`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Param eventID path string true "ID del evento"
+// @Success 200 {object} eventResponse
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "event not found"
+// @Failure 500 {string} string "internal error"
+// @Router /pets/{petID}/events/{eventID}/void [post]
 func voidEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())

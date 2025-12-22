@@ -36,11 +36,13 @@ func RegisterRoutes(r chi.Router, svc *Service, petOwners PetOwnerLookup) {
 	})
 }
 
+// inviteGrantRequest es el cuerpo de la solicitud para invitar a un delegado a una mascota.
 type inviteGrantRequest struct {
 	GranteeUserID string  `json:"grantee_user_id"`
 	Scopes        []Scope `json:"scopes"`
 }
 
+// grantResponse representa un grant de acceso delegado en las respuestas de la API.
 type grantResponse struct {
 	ID            string     `json:"id"`
 	PetID         string     `json:"pet_id"`
@@ -53,6 +55,23 @@ type grantResponse struct {
 	RevokedAt     *time.Time `json:"revoked_at,omitempty"`
 }
 
+// inviteGrantHandler godoc
+// @Summary Invitar delegado a una mascota
+// @Description Crea una invitación (grant) para que otro usuario acceda a la mascota. Solo el owner de la mascota puede invitar. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags accessgrants
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota compartida"
+// @Param payload body inviteGrantRequest true "Datos de la invitación (usuario delegado y scopes otorgados)"
+// @Success 201 {object} grantResponse
+// @Failure 400 {string} string "invalid json / invalid input / grantee_user_id requerido"
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "pet not found"
+// @Failure 500 {string} string "internal error"
+// @Router /pets/{petID}/grants [post]
 func inviteGrantHandler(svc *Service, petOwners PetOwnerLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -103,6 +122,21 @@ func inviteGrantHandler(svc *Service, petOwners PetOwnerLookup) http.HandlerFunc
 	}
 }
 
+// listGrantsByPetHandler godoc
+// @Summary Listar grants por mascota
+// @Description Lista todos los grants asociados a una mascota. Solo el owner de la mascota puede verlos. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags accessgrants
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Success 200 {array} grantResponse
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "pet not found"
+// @Failure 500 {string} string "internal error"
+// @Router /pets/{petID}/grants [get]
 func listGrantsByPetHandler(svc *Service, petOwners PetOwnerLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -137,6 +171,19 @@ func listGrantsByPetHandler(svc *Service, petOwners PetOwnerLookup) http.Handler
 	}
 }
 
+// listMyGrantsHandler godoc
+// @Summary Listar mis grants como delegado
+// @Description Lista los grants donde el usuario autenticado es el delegado (grantee). Opcionalmente filtra por estado mediante `status=invited,active`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags accessgrants
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param status query string false "Lista CSV de estados permitidos (ej: invited,active)"
+// @Success 200 {array} grantResponse
+// @Failure 401 {string} string "unauthorized"
+// @Failure 500 {string} string "internal error"
+// @Router /me/grants [get]
 func listMyGrantsHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -173,6 +220,23 @@ func listMyGrantsHandler(svc *Service) http.HandlerFunc {
 	}
 }
 
+// acceptGrantHandler godoc
+// @Summary Aceptar una invitación de grant
+// @Description Acepta una invitación pendiente para que el usuario autenticado se convierta en delegado de una mascota. Solo el grantee puede aceptar su invitación. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags accessgrants
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param grantID path string true "ID del grant a aceptar"
+// @Success 200 {object} grantResponse
+// @Failure 400 {string} string "invalid input"
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "not found"
+// @Failure 409 {string} string "bad state para aceptar (ej: ya aceptado/revocado)"
+// @Failure 500 {string} string "internal error"
+// @Router /grants/{grantID}/accept [post]
 func acceptGrantHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -203,6 +267,22 @@ func acceptGrantHandler(svc *Service) http.HandlerFunc {
 	}
 }
 
+// revokeGrantHandler godoc
+// @Summary Revocar un grant
+// @Description Revoca un grant existente. Puede ser ejecutado por el owner o, según la lógica de negocio, por el delegado cuando corresponda. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags accessgrants
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param grantID path string true "ID del grant a revocar"
+// @Success 200 {object} grantResponse
+// @Failure 400 {string} string "invalid input"
+// @Failure 401 {string} string "unauthorized"
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "not found"
+// @Failure 500 {string} string "internal error"
+// @Router /grants/{grantID}/revoke [post]
 func revokeGrantHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())

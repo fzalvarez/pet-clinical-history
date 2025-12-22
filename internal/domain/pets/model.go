@@ -2,6 +2,7 @@ package pets
 
 import "time"
 
+// Pet representa el perfil básico de una mascota registrada en el sistema.
 type Pet struct {
 	ID          string
 	OwnerUserID string

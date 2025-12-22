@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"pet-clinical-history/internal/domain/accessgrants"
 )
@@ -128,7 +127,3 @@ func (r *grantRepo) ListByGrantee(ctx context.Context, granteeUserID string) ([]
 	}
 	return out, nil
 }
-
-// (Opcional) evita import no usado de time en algunos editores si luego lo quitas.
-// Ahora sí se usa en comparación de UpdatedAt (time.Time).
-var _ = time.Time{}
