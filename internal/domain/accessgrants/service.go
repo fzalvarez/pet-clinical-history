@@ -47,8 +47,8 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 
 	scopes := normalizeScopes(in.Scopes)
 	if len(scopes) == 0 {
-		// Default mínimo útil
-		scopes = []Scope{ScopeEventsRead}
+		// Default mínimo útil para que el delegado pueda ver perfil + timeline
+		scopes = []Scope{ScopePetRead, ScopeEventsRead}
 	}
 
 	now := s.now()

@@ -43,7 +43,8 @@ func NewRouter(opts Options) http.Handler {
 	grantsSvc := accessgrants.NewService(grantsRepo)
 
 	// Rutas por módulo
-	pets.RegisterRoutes(r, petsSvc)
+	pets.RegisterRoutes(r, petsSvc, grantsSvc)
+
 	//events.RegisterRoutes(r, eventsSvc, petsSvc) // en el siguiente paso, lo haremos validar delegados
 	events.RegisterRoutes(r, eventsSvc, petsSvc, grantsSvc)
 	accessgrants.RegisterRoutes(r, grantsSvc, petsSvc)

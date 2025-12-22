@@ -1,22 +1,27 @@
 package accessgrants
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 
-	"pet-clinical-history/internal/domain/pets"
 	"pet-clinical-history/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterRoutes(r chi.Router, svc *Service, petsSvc *pets.Service) {
+// PetOwnerLookup evita importar el paquete pets (rompe ciclos).
+type PetOwnerLookup interface {
+	OwnerOf(ctx context.Context, petID string) (string, error)
+}
+
+func RegisterRoutes(r chi.Router, svc *Service, petOwners PetOwnerLookup) {
 	// Owner actions scoped by pet
 	r.Route("/pets/{petID}/grants", func(gr chi.Router) {
-		gr.Post("/", inviteGrantHandler(svc, petsSvc))
-		gr.Get("/", listGrantsByPetHandler(svc, petsSvc))
+		gr.Post("/", inviteGrantHandler(svc, petOwners))
+		gr.Get("/", listGrantsByPetHandler(svc, petOwners))
 	})
 
 	// Grantee/Owner actions scoped by grant id
@@ -48,7 +53,7 @@ type grantResponse struct {
 	RevokedAt     *time.Time `json:"revoked_at,omitempty"`
 }
 
-func inviteGrantHandler(svc *Service, petsSvc *pets.Service) http.HandlerFunc {
+func inviteGrantHandler(svc *Service, petOwners PetOwnerLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
 		if !ok || strings.TrimSpace(claims.UserID) == "" {
@@ -57,12 +62,13 @@ func inviteGrantHandler(svc *Service, petsSvc *pets.Service) http.HandlerFunc {
 		}
 
 		petID := chi.URLParam(r, "petID")
-		p, err := petsSvc.GetByID(r.Context(), petID)
-		if err != nil {
+
+		ownerID, err := petOwners.OwnerOf(r.Context(), petID)
+		if err != nil || strings.TrimSpace(ownerID) == "" {
 			http.Error(w, "pet not found", http.StatusNotFound)
 			return
 		}
-		if p.OwnerUserID != claims.UserID {
+		if ownerID != claims.UserID {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -97,7 +103,7 @@ func inviteGrantHandler(svc *Service, petsSvc *pets.Service) http.HandlerFunc {
 	}
 }
 
-func listGrantsByPetHandler(svc *Service, petsSvc *pets.Service) http.HandlerFunc {
+func listGrantsByPetHandler(svc *Service, petOwners PetOwnerLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
 		if !ok || strings.TrimSpace(claims.UserID) == "" {
@@ -106,12 +112,13 @@ func listGrantsByPetHandler(svc *Service, petsSvc *pets.Service) http.HandlerFun
 		}
 
 		petID := chi.URLParam(r, "petID")
-		p, err := petsSvc.GetByID(r.Context(), petID)
-		if err != nil {
+
+		ownerID, err := petOwners.OwnerOf(r.Context(), petID)
+		if err != nil || strings.TrimSpace(ownerID) == "" {
 			http.Error(w, "pet not found", http.StatusNotFound)
 			return
 		}
-		if p.OwnerUserID != claims.UserID {
+		if ownerID != claims.UserID {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
