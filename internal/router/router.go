@@ -1,9 +1,12 @@
 package router
 
 import (
+	"database/sql"
 	"net/http"
+	"os"
 
 	mem "pet-clinical-history/internal/adapters/storage/memory"
+	pg "pet-clinical-history/internal/adapters/storage/postgres"
 	"pet-clinical-history/internal/domain/accessgrants"
 	"pet-clinical-history/internal/domain/events"
 	"pet-clinical-history/internal/domain/pets"
@@ -16,6 +19,9 @@ import (
 
 type Options struct {
 	AuthVerifier auth.AuthVerifier // puede ser nil (modo dev)
+
+	// Opcional: si viene, usa Postgres. Si no, in-memory.
+	DB *sql.DB
 }
 
 func NewRouter(opts Options) http.Handler {
@@ -32,10 +38,37 @@ func NewRouter(opts Options) http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	var (
+		petRepo    pets.Repository
+		eventRepo  events.Repository
+		grantsRepo accessgrants.Repository
+	)
+
 	// Repos in-memory
-	petRepo := mem.NewPetRepo()
+	/* petRepo := mem.NewPetRepo()
 	eventRepo := mem.NewEventRepo()
-	grantsRepo := mem.NewAccessGrantsRepo()
+	grantsRepo := mem.NewAccessGrantsRepo() */
+
+	// Si no te pasan DB explícita, intenta por env (para dev/handoff)
+	db := opts.DB
+	if db == nil {
+		if dsn := os.Getenv("DB_DSN"); dsn != "" {
+			opened, err := pg.Open(dsn)
+			if err == nil {
+				db = opened
+			}
+		}
+	}
+
+	if db != nil {
+		petRepo = pg.NewPetsRepo(db)
+		eventRepo = pg.NewEventsRepo(db)
+		grantsRepo = pg.NewAccessGrantsRepo(db)
+	} else {
+		petRepo = mem.NewPetRepo()
+		eventRepo = mem.NewEventRepo()
+		grantsRepo = mem.NewAccessGrantsRepo()
+	}
 
 	// Services por módulo
 	petsSvc := pets.NewService(petRepo)
