@@ -79,6 +79,26 @@ func (s *Service) Create(ctx context.Context, petID string, actor Actor, in Crea
 	return e, nil
 }
 
+func (s *Service) GetByID(ctx context.Context, id string) (PetEvent, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return PetEvent{}, ErrInvalidInput
+	}
+	return s.repo.GetByID(ctx, id)
+}
+
 func (s *Service) ListByPet(ctx context.Context, petID string, filter ListFilter) ([]PetEvent, error) {
 	return s.repo.ListByPet(ctx, petID, filter)
+}
+
+// Void marca el evento como voided (no se borra).
+func (s *Service) Void(ctx context.Context, id string) (PetEvent, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return PetEvent{}, ErrInvalidInput
+	}
+	if err := s.repo.Void(ctx, id); err != nil {
+		return PetEvent{}, err
+	}
+	return s.repo.GetByID(ctx, id)
 }

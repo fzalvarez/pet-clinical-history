@@ -3,12 +3,16 @@ package memory
 import (
 	"context"
 	"errors"
+	"sort"
+	"strings"
 	"sync"
 
 	"pet-clinical-history/internal/domain/pets"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound = errors.New("not found")
+)
 
 type petRepo struct {
 	mu   sync.RWMutex
@@ -25,13 +29,26 @@ func (r *petRepo) Create(ctx context.Context, p pets.Pet) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if p.ID == "" {
+	if strings.TrimSpace(p.ID) == "" {
 		return errors.New("pet id required")
 	}
 	if _, exists := r.byID[p.ID]; exists {
 		return errors.New("pet already exists")
 	}
+	r.byID[p.ID] = p
+	return nil
+}
 
+func (r *petRepo) Update(ctx context.Context, p pets.Pet) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if strings.TrimSpace(p.ID) == "" {
+		return errors.New("pet id required")
+	}
+	if _, exists := r.byID[p.ID]; !exists {
+		return ErrNotFound
+	}
 	r.byID[p.ID] = p
 	return nil
 }
@@ -57,5 +74,11 @@ func (r *petRepo) ListByOwner(ctx context.Context, ownerUserID string) ([]pets.P
 			out = append(out, p)
 		}
 	}
+
+	// Orden estable por created_at asc (solo para consistencia en dev)
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+
 	return out, nil
 }

@@ -13,7 +13,6 @@ import (
 )
 
 func RegisterRoutes(r chi.Router, svc *Service, grantsSvc *accessgrants.Service) {
-	// Pets (owner)
 	r.Route("/pets", func(pr chi.Router) {
 		pr.Post("/", createPetHandler(svc))
 		pr.Get("/", listPetsHandler(svc))
@@ -21,7 +20,7 @@ func RegisterRoutes(r chi.Router, svc *Service, grantsSvc *accessgrants.Service)
 		// Perfil de mascota (owner o delegado con pet:read)
 		pr.Get("/{petID}", getPetHandler(svc, grantsSvc))
 
-		// Actualizar mascota (owner o delegado con pet:write)
+		// Editar perfil (owner o delegado con pet:edit_profile)
 		pr.Patch("/{petID}", updatePetHandler(svc, grantsSvc))
 	})
 
@@ -38,6 +37,15 @@ type createPetRequest struct {
 	Notes     string `json:"notes"`
 }
 
+type updatePetRequest struct {
+	Name    *string `json:"name"`
+	Species *string `json:"species"`
+	Breed   *string `json:"breed"`
+	Sex     *string `json:"sex"`
+	Notes   *string `json:"notes"`
+	// birth_date se decodifica aparte para soportar null
+}
+
 type petResponse struct {
 	ID          string     `json:"id"`
 	OwnerUserID string     `json:"owner_user_id"`
@@ -51,30 +59,13 @@ type petResponse struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
-type updatePetRequest struct {
-	// Punteros para PATCH real: nil = no tocar.
-	Name      *string `json:"name"`
-	Species   *string `json:"species"`
-	Breed     *string `json:"breed"`
-	Sex       *string `json:"sex"`
-	BirthDate *string `json:"birth_date"` // YYYY-MM-DD. Para limpiar: enviar null (ver nota abajo)
-	Notes     *string `json:"notes"`
-}
-
-// Para permitir "birth_date": null y diferenciarlo de "no enviado",
-// usamos este wrapper que detecta presencia del campo.
-type patchBirthDate struct {
-	Present bool
-	Value   *string
-}
-
 type sharedPetResponse struct {
 	Pet    petResponse          `json:"pet"`
-	Grant  sharedGrantSummary   `json:"grant"`
-	Scopes []accessgrants.Scope `json:"scopes"` // redundante pero útil para UI
+	Grant  grantMini            `json:"grant"`
+	Scopes []accessgrants.Scope `json:"scopes"`
 }
 
-type sharedGrantSummary struct {
+type grantMini struct {
 	ID     string              `json:"id"`
 	Status accessgrants.Status `json:"status"`
 }
@@ -121,7 +112,7 @@ func createPetHandler(svc *Service) http.HandlerFunc {
 }
 
 func listPetsHandler(svc *Service) http.HandlerFunc {
-	// Owner-only (sin mezclar shared)
+	// Owner-only
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
 		if !ok || strings.TrimSpace(claims.UserID) == "" {
@@ -160,7 +151,6 @@ func getPetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFu
 			return
 		}
 
-		// Owner bypass
 		if p.OwnerUserID != claims.UserID {
 			g, err := grantsSvc.GetActiveGrant(r.Context(), petID, claims.UserID)
 			if err != nil || !accessgrants.HasScope(g, accessgrants.ScopePetRead) {
@@ -173,10 +163,8 @@ func getPetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFu
 	}
 }
 
-// updatePetHandler aplica permisos:
-// - owner bypass
-// - delegado requiere grant activo + scope pet:edit_profile
 func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
+	// Owner bypass, delegado requiere pet:edit_profile
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
 		if !ok || strings.TrimSpace(claims.UserID) == "" {
@@ -185,14 +173,15 @@ func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.Handle
 		}
 
 		petID := chi.URLParam(r, "petID")
-		current, err := svc.GetByID(r.Context(), petID)
+
+		// Verifica existencia + ownership para auth
+		p, err := svc.GetByID(r.Context(), petID)
 		if err != nil {
 			http.Error(w, "pet not found", http.StatusNotFound)
 			return
 		}
 
-		// Authorize: owner bypass, else grant + scope
-		if current.OwnerUserID != claims.UserID {
+		if p.OwnerUserID != claims.UserID {
 			g, err := grantsSvc.GetActiveGrant(r.Context(), petID, claims.UserID)
 			if err != nil || !accessgrants.HasScope(g, accessgrants.ScopePetEditProfile) {
 				http.Error(w, "forbidden", http.StatusForbidden)
@@ -200,23 +189,19 @@ func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.Handle
 			}
 		}
 
-		// Decode PATCH body
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
 
-		// Para soportar birth_date: null, necesitamos detectar presencia del campo.
-		// Estrategia: decodificar a map primero para ver si "birth_date" estuvo presente.
+		// Para soportar birth_date: null, detectamos presencia en raw map
 		var raw map[string]json.RawMessage
 		if err := dec.Decode(&raw); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
 
-		// Decode campos simples usando un struct auxiliar sobre raw (sin birth_date)
+		// Parse base fields
 		var req updatePetRequest
 		{
-			// Re-marshal a JSON y decode al struct para reutilizar tags
-			// (simple y suficientemente eficiente para MVP)
 			b, _ := json.Marshal(raw)
 			if err := json.Unmarshal(b, &req); err != nil {
 				http.Error(w, "invalid json", http.StatusBadRequest)
@@ -224,36 +209,35 @@ func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.Handle
 			}
 		}
 
-		// Detectar presencia de birth_date (para permitir null = limpiar)
-		bd := patchBirthDate{Present: false, Value: nil}
-		if v, exists := raw["birth_date"]; exists {
-			bd.Present = true
+		// birth_date patch
+		bdp := BirthDatePatch{Present: false, Value: nil}
+		if v, ok := raw["birth_date"]; ok {
+			bdp.Present = true
 			if string(v) == "null" {
-				bd.Value = nil
+				bdp.Value = nil
 			} else {
 				var s string
 				if err := json.Unmarshal(v, &s); err != nil {
 					http.Error(w, "birth_date must be YYYY-MM-DD or null", http.StatusBadRequest)
 					return
 				}
-				bd.Value = &s
+				bdp.Value = &s
 			}
 		}
 
-		// Call use-case
-		updated, err := svc.UpdateProfile(r.Context(), petID, claims.UserID, UpdateProfileInput{
+		updated, err := svc.UpdateProfile(r.Context(), petID, UpdateProfileInput{
 			Name:      req.Name,
 			Species:   req.Species,
 			Breed:     req.Breed,
 			Sex:       req.Sex,
-			BirthDate: bd, // wrapper con "present"
 			Notes:     req.Notes,
+			BirthDate: bdp,
 		})
 		if err != nil {
 			switch err {
-			case ErrInvalidInput:
+			case ErrPetInvalidInput:
 				http.Error(w, err.Error(), http.StatusBadRequest)
-			case ErrNotFound:
+			case ErrPetNotFound:
 				http.Error(w, "pet not found", http.StatusNotFound)
 			default:
 				http.Error(w, "internal error", http.StatusInternalServerError)
@@ -266,7 +250,6 @@ func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.Handle
 }
 
 func listMySharedPetsHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
-	// Devuelve mascotas compartidas conmigo (grants active con pet:read)
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
 		if !ok || strings.TrimSpace(claims.UserID) == "" {
@@ -287,7 +270,7 @@ func listMySharedPetsHandler(svc *Service, grantsSvc *accessgrants.Service) http
 			if g.Status != accessgrants.StatusActive {
 				continue
 			}
-			// Para mostrar perfil, exigimos pet:read.
+			// Para mostrar perfil, exigimos pet:read
 			if !accessgrants.HasScope(g, accessgrants.ScopePetRead) {
 				continue
 			}
@@ -298,13 +281,12 @@ func listMySharedPetsHandler(svc *Service, grantsSvc *accessgrants.Service) http
 
 			p, err := svc.GetByID(r.Context(), g.PetID)
 			if err != nil {
-				// tolera grants huérfanos en MVP in-memory
 				continue
 			}
 
 			out = append(out, sharedPetResponse{
 				Pet: toPetResponse(p),
-				Grant: sharedGrantSummary{
+				Grant: grantMini{
 					ID:     g.ID,
 					Status: g.Status,
 				},
@@ -331,7 +313,7 @@ func toPetResponse(p Pet) petResponse {
 	}
 }
 
-// writeJSON está duplicado intencionalmente en handlers de distintos módulos (pets/events)
+// writeJSON está duplicado intencionalmente en handlers de distintos módulos (pets/events/accessgrants)
 // para evitar crear paquetes/helpers compartidos demasiado pronto.
 // Si más adelante se repite en más módulos, recién conviene extraerlo a un helper común.
 func writeJSON(w http.ResponseWriter, status int, v any) {

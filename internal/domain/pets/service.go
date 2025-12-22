@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ErrInvalidInput = errors.New("invalid input")
-	ErrNotFound     = errors.New("not found")
+	ErrPetInvalidInput = errors.New("invalid input")
+	ErrPetNotFound     = errors.New("not found")
 )
 
 // Service agrupa casos de uso del dominio Pets.
@@ -38,31 +38,22 @@ type CreateInput struct {
 	Notes     string
 }
 
-type UpdateProfileInput struct {
-	Name      *string
-	Species   *string
-	Breed     *string
-	Sex       *string
-	BirthDate patchBirthDate // wrapper con Present + Value (*string o nil)
-	Notes     *string
-}
-
 func (s *Service) Create(ctx context.Context, ownerUserID string, in CreateInput) (Pet, error) {
-	if strings.TrimSpace(ownerUserID) == "" {
-		return Pet{}, ErrInvalidInput
+	ownerUserID = strings.TrimSpace(ownerUserID)
+	if ownerUserID == "" {
+		return Pet{}, ErrPetInvalidInput
 	}
-	if strings.TrimSpace(in.Name) == "" {
-		return Pet{}, ErrInvalidInput
-	}
-	if strings.TrimSpace(in.Species) == "" {
-		return Pet{}, ErrInvalidInput
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return Pet{}, ErrPetInvalidInput
 	}
 
 	now := s.now()
+
 	p := Pet{
 		ID:          uuid.NewString(),
 		OwnerUserID: ownerUserID,
-		Name:        strings.TrimSpace(in.Name),
+		Name:        name,
 		Species:     strings.TrimSpace(in.Species),
 		Breed:       strings.TrimSpace(in.Breed),
 		Sex:         strings.TrimSpace(in.Sex),
@@ -79,28 +70,58 @@ func (s *Service) Create(ctx context.Context, ownerUserID string, in CreateInput
 }
 
 func (s *Service) GetByID(ctx context.Context, id string) (Pet, error) {
-	return s.repo.GetByID(ctx, id)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Pet{}, ErrPetInvalidInput
+	}
+	p, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return Pet{}, err
+	}
+	return p, nil
 }
 
 func (s *Service) ListByOwner(ctx context.Context, ownerUserID string) ([]Pet, error) {
+	ownerUserID = strings.TrimSpace(ownerUserID)
+	if ownerUserID == "" {
+		return nil, ErrPetInvalidInput
+	}
 	return s.repo.ListByOwner(ctx, ownerUserID)
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, petID, actorUserID string, in UpdateProfileInput) (Pet, error) {
-	if strings.TrimSpace(petID) == "" || strings.TrimSpace(actorUserID) == "" {
-		return Pet{}, ErrInvalidInput
+// BirthDatePatch permite PATCH real diferenciando:
+// - Present=false: no tocar
+// - Present=true y Value=nil: limpiar
+// - Present=true y Value!=nil: parsear YYYY-MM-DD
+type BirthDatePatch struct {
+	Present bool
+	Value   *string
+}
+
+type UpdateProfileInput struct {
+	Name      *string
+	Species   *string
+	Breed     *string
+	Sex       *string
+	BirthDate BirthDatePatch
+	Notes     *string
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, petID string, in UpdateProfileInput) (Pet, error) {
+	petID = strings.TrimSpace(petID)
+	if petID == "" {
+		return Pet{}, ErrPetInvalidInput
 	}
 
-	p, err := s.GetByID(ctx, petID)
+	p, err := s.repo.GetByID(ctx, petID)
 	if err != nil {
-		return Pet{}, ErrNotFound
+		return Pet{}, ErrPetNotFound
 	}
 
-	// Aplicar cambios PATCH
 	if in.Name != nil {
 		v := strings.TrimSpace(*in.Name)
 		if v == "" {
-			return Pet{}, ErrInvalidInput
+			return Pet{}, ErrPetInvalidInput
 		}
 		p.Name = v
 	}
@@ -117,29 +138,26 @@ func (s *Service) UpdateProfile(ctx context.Context, petID, actorUserID string, 
 		p.Notes = strings.TrimSpace(*in.Notes)
 	}
 
-	// BirthDate: si estuvo presente, puede ser nil (limpiar) o string YYYY-MM-DD
 	if in.BirthDate.Present {
 		if in.BirthDate.Value == nil {
 			p.BirthDate = nil
 		} else {
 			raw := strings.TrimSpace(*in.BirthDate.Value)
 			if raw == "" {
-				return Pet{}, ErrInvalidInput
+				return Pet{}, ErrPetInvalidInput
 			}
 			t, err := time.Parse("2006-01-02", raw)
 			if err != nil {
-				return Pet{}, ErrInvalidInput
+				return Pet{}, ErrPetInvalidInput
 			}
 			p.BirthDate = &t
 		}
 	}
 
-	p.UpdatedAt = time.Now()
+	p.UpdatedAt = s.now()
 
-	// Persistir
 	if err := s.repo.Update(ctx, p); err != nil {
 		return Pet{}, err
 	}
-
 	return p, nil
 }

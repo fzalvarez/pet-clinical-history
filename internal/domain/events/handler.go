@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +19,9 @@ func RegisterRoutes(r chi.Router, svc *Service, petsSvc *pets.Service, grantsSvc
 	r.Route("/pets/{petID}/events", func(er chi.Router) {
 		er.Post("/", createEventHandler(svc, petsSvc, grantsSvc))
 		er.Get("/", listEventsHandler(svc, petsSvc, grantsSvc))
+
+		// Anular (void) evento (owner o delegado con events:void)
+		er.Post("/{eventID}/void", voidEventHandler(svc, petsSvc, grantsSvc))
 	})
 }
 
@@ -134,7 +138,12 @@ func listEventsHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgra
 
 		filter, err := parseListFilter(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			// mensajes claros sin meter un error type nuevo
+			if strings.Contains(err.Error(), "from must") || strings.Contains(err.Error(), "to must") {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "invalid query params", http.StatusBadRequest)
 			return
 		}
 
@@ -150,6 +159,56 @@ func listEventsHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgra
 		}
 
 		writeJSON(w, http.StatusOK, out)
+	}
+}
+
+func voidEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetClaims(r.Context())
+		if !ok || strings.TrimSpace(claims.UserID) == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		petID := chi.URLParam(r, "petID")
+		eventID := chi.URLParam(r, "eventID")
+
+		// Pet existe + permisos
+		p, err := petsSvc.GetByID(r.Context(), petID)
+		if err != nil {
+			http.Error(w, "pet not found", http.StatusNotFound)
+			return
+		}
+
+		// Evento existe y pertenece al pet
+		ev, err := svc.GetByID(r.Context(), eventID)
+		if err != nil || ev.ID == "" {
+			http.Error(w, "event not found", http.StatusNotFound)
+			return
+		}
+		if ev.PetID != petID {
+			http.Error(w, "event not found", http.StatusNotFound)
+			return
+		}
+
+		// Permisos:
+		// - Owner: siempre permitido
+		// - Delegado: requiere grant activo con ScopeEventsVoid
+		if p.OwnerUserID != claims.UserID {
+			g, err := grantsSvc.GetActiveGrant(r.Context(), petID, claims.UserID)
+			if err != nil || !accessgrants.HasScope(g, accessgrants.ScopeEventsVoid) {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+		}
+
+		updated, err := svc.Void(r.Context(), eventID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, toEventResponse(updated))
 	}
 }
 
@@ -183,14 +242,14 @@ func parseListFilter(r *http.Request) (ListFilter, error) {
 	if v := strings.TrimSpace(r.URL.Query().Get("from")); v != "" {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return ListFilter{}, ErrInvalidInput
+			return ListFilter{}, errors.New("from must be RFC3339")
 		}
 		filter.From = &t
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("to")); v != "" {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return ListFilter{}, ErrInvalidInput
+			return ListFilter{}, errors.New("to must be RFC3339")
 		}
 		filter.To = &t
 	}
