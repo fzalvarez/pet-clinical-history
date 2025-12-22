@@ -138,12 +138,7 @@ func listEventsHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgra
 
 		filter, err := parseListFilter(r)
 		if err != nil {
-			// mensajes claros sin meter un error type nuevo
-			if strings.Contains(err.Error(), "from must") || strings.Contains(err.Error(), "to must") {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			http.Error(w, "invalid query params", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -173,25 +168,14 @@ func voidEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgran
 		petID := chi.URLParam(r, "petID")
 		eventID := chi.URLParam(r, "eventID")
 
-		// Pet existe + permisos
+		// Pet existe
 		p, err := petsSvc.GetByID(r.Context(), petID)
 		if err != nil {
 			http.Error(w, "pet not found", http.StatusNotFound)
 			return
 		}
 
-		// Evento existe y pertenece al pet
-		ev, err := svc.GetByID(r.Context(), eventID)
-		if err != nil || ev.ID == "" {
-			http.Error(w, "event not found", http.StatusNotFound)
-			return
-		}
-		if ev.PetID != petID {
-			http.Error(w, "event not found", http.StatusNotFound)
-			return
-		}
-
-		// Permisos:
+		// Permisos (primero, para no filtrar si existe el evento)
 		// - Owner: siempre permitido
 		// - Delegado: requiere grant activo con ScopeEventsVoid
 		if p.OwnerUserID != claims.UserID {
@@ -202,8 +186,20 @@ func voidEventHandler(svc *Service, petsSvc *pets.Service, grantsSvc *accessgran
 			}
 		}
 
+		// Evento existe y pertenece al pet
+		ev, err := svc.GetByID(r.Context(), eventID)
+		if err != nil || strings.TrimSpace(ev.ID) == "" || ev.PetID != petID {
+			http.Error(w, "event not found", http.StatusNotFound)
+			return
+		}
+
 		updated, err := svc.Void(r.Context(), eventID)
 		if err != nil {
+			// MVP: tratamos "not found" como 404 (evita 500 innecesarios en memoria)
+			if strings.Contains(strings.ToLower(err.Error()), "not found") {
+				http.Error(w, "event not found", http.StatusNotFound)
+				return
+			}
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

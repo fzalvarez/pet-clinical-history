@@ -47,8 +47,9 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 		return Grant{}, ErrInvalidInput
 	}
 
-	// Scopes: si viene vacío, aplicamos default útil (ver perfil + ver timeline).
-	// Si viene con valores, los validamos estrictamente.
+	// Scopes:
+	// - Si viene vacío: default útil (ver perfil + ver timeline)
+	// - Si viene con valores: validación estricta (solo scopes soportados)
 	var scopes []Scope
 	var err error
 	if len(in.Scopes) == 0 {
@@ -64,25 +65,6 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 	}
 
 	now := s.now()
-
-	// 1) Buscar grants existentes para (petID, granteeID, ownerID)
-	existing, allMatches, err := s.findLatestMatch(ctx, petID, ownerID, granteeID)
-	if err == nil && existing.ID != "" {
-		// Si el "winner" está revoked, permitimos re-invitar creando uno nuevo.
-		if existing.Status != StatusRevoked {
-			// 2) Deduplicar: revocar cualquier otro matching grant no-revoked
-			_ = s.revokeOtherMatches(ctx, existing.ID, allMatches, now)
-
-			// 3) Actualizar scopes del winner (permite "cambiar" scopes sin endpoint adicional)
-			existing.Scopes = scopes
-			existing.UpdatedAt = now
-
-			if err := s.repo.Update(ctx, existing); err != nil {
-				return Grant{}, err
-			}
-			return existing, nil
-		}
-	}
 
 	// Crear nuevo invite
 	g := Grant{
@@ -100,6 +82,7 @@ func (s *Service) Invite(ctx context.Context, in InviteInput) (Grant, error) {
 	if err := s.repo.Create(ctx, g); err != nil {
 		return Grant{}, err
 	}
+
 	return g, nil
 }
 
@@ -123,21 +106,28 @@ func (s *Service) Accept(ctx context.Context, grantID, granteeUserID string) (Gr
 		return Grant{}, ErrBadState
 	}
 
+	now := s.now()
+
 	// Idempotente
 	if g.Status == StatusActive {
+		// defensivo: garantizar "solo un activo" para el mismo pet+grantee
+		_ = s.revokeOtherByPetAndGrantee(ctx, g.ID, g.PetID, g.GranteeUserID, now)
 		return g, nil
 	}
 	if g.Status != StatusInvited {
 		return Grant{}, ErrBadState
 	}
 
-	now := s.now()
 	g.Status = StatusActive
 	g.UpdatedAt = now
 
 	if err := s.repo.Update(ctx, g); err != nil {
 		return Grant{}, err
 	}
+
+	// Cierra loop: al activar uno, revoca cualquier otro grant no-revocado para el mismo pet+grantee.
+	_ = s.revokeOtherByPetAndGrantee(ctx, g.ID, g.PetID, g.GranteeUserID, now)
+
 	return g, nil
 }
 
@@ -214,45 +204,29 @@ func HasScope(g Grant, scope Scope) bool {
 	return false
 }
 
-func (s *Service) findLatestMatch(ctx context.Context, petID, ownerID, granteeID string) (Grant, []Grant, error) {
+// revokeOtherByPetAndGrantee revoca best-effort cualquier otro grant no revocado para (petID, granteeID),
+// excepto keepID. Esto evita múltiples "activos" para el mismo delegado.
+func (s *Service) revokeOtherByPetAndGrantee(ctx context.Context, keepID, petID, granteeID string, now time.Time) error {
 	items, err := s.repo.ListByPet(ctx, petID)
 	if err != nil {
-		return Grant{}, nil, err
+		return err
 	}
-
-	matches := make([]Grant, 0)
-	var winner Grant
-	hasWinner := false
 
 	for _, g := range items {
-		if g.PetID != petID || g.OwnerUserID != ownerID || g.GranteeUserID != granteeID {
+		if g.ID == "" || g.ID == keepID {
 			continue
 		}
-		matches = append(matches, g)
-
-		if !hasWinner || g.UpdatedAt.After(winner.UpdatedAt) {
-			winner = g
-			hasWinner = true
-		}
-	}
-
-	if !hasWinner {
-		return Grant{}, matches, ErrNotFound
-	}
-	return winner, matches, nil
-}
-
-func (s *Service) revokeOtherMatches(ctx context.Context, winnerID string, matches []Grant, now time.Time) error {
-	for _, g := range matches {
-		if g.ID == "" || g.ID == winnerID {
+		if g.PetID != petID || g.GranteeUserID != granteeID {
 			continue
 		}
 		if g.Status == StatusRevoked {
 			continue
 		}
+
 		g.Status = StatusRevoked
 		g.UpdatedAt = now
 		g.RevokedAt = &now
+
 		_ = s.repo.Update(ctx, g) // best-effort (MVP)
 	}
 	return nil

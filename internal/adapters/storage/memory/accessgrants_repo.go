@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"pet-clinical-history/internal/domain/accessgrants"
 )
@@ -71,18 +72,48 @@ func (r *grantRepo) ListByPet(ctx context.Context, petID string) ([]accessgrants
 	return out, nil
 }
 
+// Defensivo: si por data sucia existieran múltiples grants activos,
+// devolvemos el más reciente por UpdatedAt (y en empate, por CreatedAt).
 func (r *grantRepo) GetActiveGrant(ctx context.Context, petID, granteeUserID string) (accessgrants.Grant, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var winner accessgrants.Grant
+	has := false
+
 	for _, g := range r.byID {
-		if g.PetID == petID &&
-			g.GranteeUserID == granteeUserID &&
-			g.Status == accessgrants.StatusActive {
-			return g, nil
+		if g.PetID != petID {
+			continue
+		}
+		if g.GranteeUserID != granteeUserID {
+			continue
+		}
+		if g.Status != accessgrants.StatusActive {
+			continue
+		}
+
+		if !has {
+			winner = g
+			has = true
+			continue
+		}
+
+		if g.UpdatedAt.After(winner.UpdatedAt) {
+			winner = g
+			continue
+		}
+		if g.UpdatedAt.Equal(winner.UpdatedAt) {
+			// desempate por CreatedAt si existiera
+			if g.CreatedAt.After(winner.CreatedAt) {
+				winner = g
+			}
 		}
 	}
-	return accessgrants.Grant{}, ErrNotFound
+
+	if !has {
+		return accessgrants.Grant{}, ErrNotFound
+	}
+	return winner, nil
 }
 
 func (r *grantRepo) ListByGrantee(ctx context.Context, granteeUserID string) ([]accessgrants.Grant, error) {
@@ -97,3 +128,7 @@ func (r *grantRepo) ListByGrantee(ctx context.Context, granteeUserID string) ([]
 	}
 	return out, nil
 }
+
+// (Opcional) evita import no usado de time en algunos editores si luego lo quitas.
+// Ahora sí se usa en comparación de UpdatedAt (time.Time).
+var _ = time.Time{}
