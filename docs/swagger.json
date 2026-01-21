@@ -1,0 +1,1313 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API REST para gestión de historiales clínicos de mascotas con sistema de delegación de acceso.",
+        "title": "Pet Clinical History API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "https://odyssoft.com/support",
+            "email": "support@odyssoft.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/grants/{grantID}/accept": {
+            "post": {
+                "description": "Acepta una invitación pendiente para que el usuario autenticado se convierta en delegado de una mascota. Solo el grantee puede aceptar su invitación. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accessgrants"
+                ],
+                "summary": "Aceptar una invitación de grant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID del grant a aceptar",
+                        "name": "grantID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/accessgrants.grantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "bad state para aceptar (ej: ya aceptado/revocado)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/grants/{grantID}/revoke": {
+            "post": {
+                "description": "Revoca un grant existente. Puede ser ejecutado por el owner o, según la lógica de negocio, por el delegado cuando corresponda. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accessgrants"
+                ],
+                "summary": "Revocar un grant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID del grant a revocar",
+                        "name": "grantID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/accessgrants.grantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/grants": {
+            "get": {
+                "description": "Lista los grants donde el usuario autenticado es el delegado (grantee). Opcionalmente filtra por estado mediante `status=invited,active`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accessgrants"
+                ],
+                "summary": "Listar mis grants como delegado",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Lista CSV de estados permitidos (ej: invited,active)",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/accessgrants.grantResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/pets": {
+            "get": {
+                "description": "Lista las mascotas compartidas con el usuario autenticado mediante grants activos que incluyan el scope `pet:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pets"
+                ],
+                "summary": "Listar mascotas compartidas conmigo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/pets.sharedPetResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pets": {
+            "get": {
+                "description": "Lista todas las mascotas cuyo propietario es el usuario autenticado. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod). Solo el owner ve este listado; los delegados no listan aquí.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pets"
+                ],
+                "summary": "Listar mis mascotas",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/pets.petResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Crea una mascota. Species: `dog`, `cat`. Breeds Perro: `labrador`, `golden_retriever`, `poodle`, etc. Breeds Gato: `persian`, `common`, etc.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pets"
+                ],
+                "summary": "Crear una mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Datos de la mascota; birth_date opcional (YYYY-MM-DD)",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/pets.createPetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/pets.petResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petID}": {
+            "get": {
+                "description": "Obtiene el perfil de una mascota. El dueño siempre tiene acceso (bypass). Un delegado necesita un grant activo con scope `pet:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pets"
+                ],
+                "summary": "Obtener perfil de mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/pets.petResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "pet not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Actualiza parcialmente el perfil de una mascota. El dueño siempre tiene acceso (bypass). Un delegado necesita un grant activo con scope `pet:edit_profile`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod). Campo `birth_date` se maneja con semántica PATCH especial: si no se envía, no cambia; si se envía como `null`, se limpia; si se envía como string `YYYY-MM-DD`, se actualiza.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pets"
+                ],
+                "summary": "Actualizar perfil de mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Campos a actualizar",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/pets.updatePetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/pets.petResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petID}/events": {
+            "get": {
+                "description": "Lista los eventos clínicos de una mascota. El dueño siempre puede verlos. Un delegado necesita un grant activo con scope `events:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod). Permite filtrar por tipos, rango de fechas y texto.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "events"
+                ],
+                "summary": "Listar eventos de una mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Máximo de eventos a devolver (1-200). Por defecto 50",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Lista CSV de tipos de evento a incluir (ej: MEDICAL_VISIT,BATH)",
+                        "name": "types",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha/hora mínima occurred_at (RFC3339)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha/hora máxima occurred_at (RFC3339)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Texto de búsqueda libre en título/notas",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/events.eventResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Parámetros de filtro inválidos",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "pet not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Crea un nuevo evento clínico para la mascota indicada. El dueño siempre puede crear eventos. Un delegado necesita un grant activo con scope `events:create`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "events"
+                ],
+                "summary": "Crear evento de mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos del evento; occurred_at en formato RFC3339",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/events.createEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/events.eventResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid json / occurred_at inválido / reglas de negocio",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "pet not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petID}/events/{eventID}/void": {
+            "post": {
+                "description": "Anula un evento existente de la mascota. El dueño siempre puede anular. Un delegado necesita un grant activo con scope `events:void`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "events"
+                ],
+                "summary": "Anular (void) un evento",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID del evento",
+                        "name": "eventID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/events.eventResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "event not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petID}/grants": {
+            "get": {
+                "description": "Lista todos los grants asociados a una mascota. Solo el owner de la mascota puede verlos. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accessgrants"
+                ],
+                "summary": "Listar grants por mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/accessgrants.grantResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "pet not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Crea una invitación (grant) para que otro usuario acceda a la mascota. Solo el owner de la mascota puede invitar. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer \u003ctoken\u003e` (prod).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accessgrants"
+                ],
+                "summary": "Invitar delegado a una mascota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Solo en modo dev, ID de usuario para depuración",
+                        "name": "X-Debug-User-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token en producción",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mascota compartida",
+                        "name": "petID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos de la invitación (usuario delegado y scopes otorgados)",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/accessgrants.inviteGrantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/accessgrants.grantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid json / invalid input / grantee_user_id requerido",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "pet not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "accessgrants.Scope": {
+            "type": "string",
+            "enum": [
+                "pet:read",
+                "pet:edit_profile",
+                "events:read",
+                "events:create",
+                "events:void",
+                "attachments:add"
+            ],
+            "x-enum-varnames": [
+                "ScopePetRead",
+                "ScopePetEditProfile",
+                "ScopeEventsRead",
+                "ScopeEventsCreate",
+                "ScopeEventsVoid",
+                "ScopeAttachmentsAdd"
+            ]
+        },
+        "accessgrants.Status": {
+            "type": "string",
+            "enum": [
+                "invited",
+                "active",
+                "revoked"
+            ],
+            "x-enum-varnames": [
+                "StatusInvited",
+                "StatusActive",
+                "StatusRevoked"
+            ]
+        },
+        "accessgrants.grantResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "grantee_user_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "owner_user_id": {
+                    "type": "string"
+                },
+                "pet_id": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/accessgrants.Scope"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/accessgrants.Status"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "accessgrants.inviteGrantRequest": {
+            "type": "object",
+            "properties": {
+                "grantee_user_id": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/accessgrants.Scope"
+                    }
+                }
+            }
+        },
+        "events.ActorType": {
+            "type": "string",
+            "enum": [
+                "OWNER_USER",
+                "DELEGATE_USER",
+                "EXTERNAL_SYSTEM"
+            ],
+            "x-enum-varnames": [
+                "ActorTypeOwnerUser",
+                "ActorTypeDelegateUser",
+                "ActorTypeExternalSystem"
+            ]
+        },
+        "events.EventStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "voided"
+            ],
+            "x-enum-varnames": [
+                "EventStatusActive",
+                "EventStatusVoided"
+            ]
+        },
+        "events.EventType": {
+            "type": "string",
+            "enum": [
+                "PROFILE_UPDATED",
+                "WEIGHT_RECORDED",
+                "NOTE",
+                "MEDICAL_VISIT",
+                "MEDICATION_PRESCRIBED",
+                "VACCINE",
+                "DEWORMING",
+                "FLEA_TREATMENT",
+                "BATH",
+                "ATTACHMENT_ADDED"
+            ],
+            "x-enum-varnames": [
+                "EventTypeProfileUpdated",
+                "EventTypeWeightRecorded",
+                "EventTypeNote",
+                "EventTypeMedicalVisit",
+                "EventTypeMedicationPresc",
+                "EventTypeVaccine",
+                "EventTypeDeworming",
+                "EventTypeFleaTreatment",
+                "EventTypeBath",
+                "EventTypeAttachmentAdded"
+            ]
+        },
+        "events.Source": {
+            "type": "string",
+            "enum": [
+                "manual",
+                "smartpet",
+                "integration"
+            ],
+            "x-enum-varnames": [
+                "SourceManual",
+                "SourceSmartPet",
+                "SourceIntegration"
+            ]
+        },
+        "events.Visibility": {
+            "type": "string",
+            "enum": [
+                "private",
+                "shared_with_delegates"
+            ],
+            "x-enum-varnames": [
+                "VisibilityPrivate",
+                "VisibilityShared"
+            ]
+        },
+        "events.createEventRequest": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "description": "RFC3339",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "opcional",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/events.Source"
+                        }
+                    ]
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "enum": [
+                        "NOTE",
+                        "MEDICAL_VISIT",
+                        "VACCINE",
+                        "DEWORMING",
+                        "BATH",
+                        "PROFILE_UPDATED",
+                        "WEIGHT_RECORDED",
+                        "MEDICATION_PRESCRIBED",
+                        "FLEA_TREATMENT",
+                        "ATTACHMENT_ADDED"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/events.EventType"
+                        }
+                    ]
+                },
+                "visibility": {
+                    "description": "opcional",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/events.Visibility"
+                        }
+                    ]
+                }
+            }
+        },
+        "events.eventResponse": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string"
+                },
+                "actor_type": {
+                    "$ref": "#/definitions/events.ActorType"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "pet_id": {
+                    "type": "string"
+                },
+                "recorded_at": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/definitions/events.Source"
+                },
+                "status": {
+                    "$ref": "#/definitions/events.EventStatus"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/events.EventType"
+                },
+                "visibility": {
+                    "$ref": "#/definitions/events.Visibility"
+                }
+            }
+        },
+        "pets.Sex": {
+            "type": "string",
+            "enum": [
+                "male",
+                "female",
+                "unknown"
+            ],
+            "x-enum-varnames": [
+                "SexMale",
+                "SexFemale",
+                "SexUnknown"
+            ]
+        },
+        "pets.Species": {
+            "type": "string",
+            "enum": [
+                "dog",
+                "cat"
+            ],
+            "x-enum-varnames": [
+                "SpeciesDog",
+                "SpeciesCat"
+            ]
+        },
+        "pets.createPetRequest": {
+            "type": "object",
+            "properties": {
+                "birth_date": {
+                    "description": "YYYY-MM-DD opcional",
+                    "type": "string"
+                },
+                "breed": {
+                    "description": "Ej para dog: labrador, poodle. Ej para cat: persian, common.",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "sex": {
+                    "enum": [
+                        "male",
+                        "female",
+                        "unknown"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/pets.Sex"
+                        }
+                    ]
+                },
+                "species": {
+                    "description": "dog, cat",
+                    "enum": [
+                        "dog",
+                        "cat"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/pets.Species"
+                        }
+                    ]
+                }
+            }
+        },
+        "pets.grantMini": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/accessgrants.Status"
+                }
+            }
+        },
+        "pets.petResponse": {
+            "type": "object",
+            "properties": {
+                "birth_date": {
+                    "type": "string"
+                },
+                "breed": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "owner_user_id": {
+                    "type": "string"
+                },
+                "sex": {
+                    "$ref": "#/definitions/pets.Sex"
+                },
+                "species": {
+                    "$ref": "#/definitions/pets.Species"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "pets.sharedPetResponse": {
+            "type": "object",
+            "properties": {
+                "grant": {
+                    "$ref": "#/definitions/pets.grantMini"
+                },
+                "pet": {
+                    "$ref": "#/definitions/pets.petResponse"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/accessgrants.Scope"
+                    }
+                }
+            }
+        },
+        "pets.updatePetRequest": {
+            "type": "object",
+            "properties": {
+                "breed": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "sex": {
+                    "enum": [
+                        "male",
+                        "female",
+                        "unknown"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/pets.Sex"
+                        }
+                    ]
+                },
+                "species": {
+                    "enum": [
+                        "dog",
+                        "cat"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/pets.Species"
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Token JWT obtenido de Odin-IAM. Formato: `Bearer \u003ctoken\u003e`",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "DebugUserID": {
+            "description": "Solo en modo dev. Permite simular autenticación sin token real.",
+            "type": "apiKey",
+            "name": "X-Debug-User-ID",
+            "in": "header"
+        }
+    }
+}

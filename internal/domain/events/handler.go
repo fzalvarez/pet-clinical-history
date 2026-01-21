@@ -27,7 +27,7 @@ func RegisterRoutes(r chi.Router, svc *Service, petsSvc *pets.Service, grantsSvc
 
 // createEventRequest es el cuerpo de la solicitud para registrar un nuevo evento clínico.
 type createEventRequest struct {
-	Type       EventType  `json:"type"`
+	Type       EventType  `json:"type" enums:"NOTE,MEDICAL_VISIT,VACCINE,DEWORMING,BATH,PROFILE_UPDATED,WEIGHT_RECORDED,MEDICATION_PRESCRIBED,FLEA_TREATMENT,ATTACHMENT_ADDED"`
 	OccurredAt string     `json:"occurred_at"` // RFC3339
 	Title      string     `json:"title"`
 	Notes      string     `json:"notes"`

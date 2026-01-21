@@ -31,9 +31,9 @@ func NewService(repo Repository) *Service {
 
 type CreateInput struct {
 	Name      string
-	Species   string
+	Species   Species
 	Breed     string
-	Sex       string
+	Sex       Sex
 	BirthDate *time.Time
 	Notes     string
 }
@@ -54,9 +54,9 @@ func (s *Service) Create(ctx context.Context, ownerUserID string, in CreateInput
 		ID:          uuid.NewString(),
 		OwnerUserID: ownerUserID,
 		Name:        name,
-		Species:     strings.TrimSpace(in.Species),
+		Species:     Species(strings.TrimSpace(string(in.Species))),
 		Breed:       strings.TrimSpace(in.Breed),
-		Sex:         strings.TrimSpace(in.Sex),
+		Sex:         Sex(strings.TrimSpace(string(in.Sex))),
 		BirthDate:   in.BirthDate,
 		Notes:       strings.TrimSpace(in.Notes),
 		CreatedAt:   now,
@@ -100,9 +100,9 @@ type BirthDatePatch struct {
 
 type UpdateProfileInput struct {
 	Name      *string
-	Species   *string
+	Species   *Species
 	Breed     *string
-	Sex       *string
+	Sex       *Sex
 	BirthDate BirthDatePatch
 	Notes     *string
 }
@@ -126,13 +126,13 @@ func (s *Service) UpdateProfile(ctx context.Context, petID string, in UpdateProf
 		p.Name = v
 	}
 	if in.Species != nil {
-		p.Species = strings.TrimSpace(*in.Species)
+		p.Species = Species(strings.TrimSpace(string(*in.Species)))
 	}
 	if in.Breed != nil {
 		p.Breed = strings.TrimSpace(*in.Breed)
 	}
 	if in.Sex != nil {
-		p.Sex = strings.TrimSpace(*in.Sex)
+		p.Sex = Sex(strings.TrimSpace(string(*in.Sex)))
 	}
 	if in.Notes != nil {
 		p.Notes = strings.TrimSpace(*in.Notes)

@@ -30,22 +30,21 @@ func RegisterRoutes(r chi.Router, svc *Service, grantsSvc *accessgrants.Service)
 
 // createPetRequest es el cuerpo de la solicitud para crear una nueva mascota.
 type createPetRequest struct {
-	Name      string `json:"name"`
-	Species   string `json:"species"`
-	Breed     string `json:"breed"`
-	Sex       string `json:"sex"`
-	BirthDate string `json:"birth_date"` // YYYY-MM-DD opcional
-	Notes     string `json:"notes"`
+	Name      string  `json:"name"`
+	Species   Species `json:"species" enums:"dog,cat"` // dog, cat
+	Breed     string  `json:"breed"`                   // Ej para dog: labrador, poodle. Ej para cat: persian, common.
+	Sex       Sex     `json:"sex" enums:"male,female,unknown"`
+	BirthDate string  `json:"birth_date"` // YYYY-MM-DD opcional
+	Notes     string  `json:"notes"`
 }
 
 // updatePetRequest es el cuerpo parcial para actualizar el perfil de una mascota.
-// El campo birth_date se maneja aparte para soportar PATCH con semántica especial.
 type updatePetRequest struct {
-	Name    *string `json:"name"`
-	Species *string `json:"species"`
-	Breed   *string `json:"breed"`
-	Sex     *string `json:"sex"`
-	Notes   *string `json:"notes"`
+	Name    *string  `json:"name"`
+	Species *Species `json:"species" enums:"dog,cat"`
+	Breed   *string  `json:"breed"`
+	Sex     *Sex     `json:"sex" enums:"male,female,unknown"`
+	Notes   *string  `json:"notes"`
 	// birth_date se decodifica aparte para soportar null
 }
 
@@ -54,9 +53,9 @@ type petResponse struct {
 	ID          string     `json:"id"`
 	OwnerUserID string     `json:"owner_user_id"`
 	Name        string     `json:"name"`
-	Species     string     `json:"species"`
+	Species     Species    `json:"species"`
 	Breed       string     `json:"breed"`
-	Sex         string     `json:"sex"`
+	Sex         Sex        `json:"sex"`
 	BirthDate   *time.Time `json:"birth_date,omitempty"`
 	Notes       string     `json:"notes"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -78,7 +77,16 @@ type grantMini struct {
 
 // createPetHandler godoc
 // @Summary Crear una mascota
-// @Description Crea una nueva mascota asociada al usuario autenticado. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod). Solo el propietario puede crear sus mascotas (no aplica delegación).
+// @Description Crea una mascota. Species: `dog`, `cat`. Breeds Perro: `labrador`, `golden_retriever`, `poodle`, etc. Breeds Gato: `persian`, `common`, etc.
+// @Tags pets
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param payload body createPetRequest true "Datos de la mascota; birth_date opcional (YYYY-MM-DD)"
+// @Success 201 {object} petResponse
+// @Failure 401 {string} string "unauthorized"
+// @Router /pets [post]
 func createPetHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())
@@ -123,6 +131,13 @@ func createPetHandler(svc *Service) http.HandlerFunc {
 // listPetsHandler godoc
 // @Summary Listar mis mascotas
 // @Description Lista todas las mascotas cuyo propietario es el usuario autenticado. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod). Solo el owner ve este listado; los delegados no listan aquí.
+// @Tags pets
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Success 200 {array} petResponse
+// @Failure 401 {string} string "unauthorized"
+// @Router /pets [get]
 func listPetsHandler(svc *Service) http.HandlerFunc {
 	// Owner-only
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -150,6 +165,15 @@ func listPetsHandler(svc *Service) http.HandlerFunc {
 // getPetHandler godoc
 // @Summary Obtener perfil de mascota
 // @Description Obtiene el perfil de una mascota. El dueño siempre tiene acceso (bypass). Un delegado necesita un grant activo con scope `pet:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags pets
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Success 200 {object} petResponse
+// @Failure 403 {string} string "forbidden"
+// @Failure 404 {string} string "pet not found"
+// @Router /pets/{petID} [get]
 func getPetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	// Owner bypass, delegado requiere pet:read
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +205,16 @@ func getPetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFu
 // updatePetHandler godoc
 // @Summary Actualizar perfil de mascota
 // @Description Actualiza parcialmente el perfil de una mascota. El dueño siempre tiene acceso (bypass). Un delegado necesita un grant activo con scope `pet:edit_profile`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod). Campo `birth_date` se maneja con semántica PATCH especial: si no se envía, no cambia; si se envía como `null`, se limpia; si se envía como string `YYYY-MM-DD`, se actualiza.
+// @Tags pets
+// @Accept json
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Param petID path string true "ID de la mascota"
+// @Param payload body updatePetRequest true "Campos a actualizar"
+// @Success 200 {object} petResponse
+// @Failure 403 {string} string "forbidden"
+// @Router /pets/{petID} [patch]
 func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	// Owner bypass, delegado requiere pet:edit_profile
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +304,12 @@ func updatePetHandler(svc *Service, grantsSvc *accessgrants.Service) http.Handle
 // listMySharedPetsHandler godoc
 // @Summary Listar mascotas compartidas conmigo
 // @Description Lista las mascotas compartidas con el usuario autenticado mediante grants activos que incluyan el scope `pet:read`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+// @Tags pets
+// @Produce json
+// @Param X-Debug-User-ID header string false "Solo en modo dev, ID de usuario para depuración"
+// @Param Authorization header string false "Bearer token en producción"
+// @Success 200 {array} sharedPetResponse
+// @Router /me/pets [get]
 func listMySharedPetsHandler(svc *Service, grantsSvc *accessgrants.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.GetClaims(r.Context())

@@ -8,6 +8,7 @@ const (
 	EventTypeNote            EventType = "NOTE"
 	EventTypeMedicalVisit    EventType = "MEDICAL_VISIT"
 	EventTypeMedicationPresc EventType = "MEDICATION_PRESCRIBED"
+	EventTypeVaccine         EventType = "VACCINE"
 	EventTypeDeworming       EventType = "DEWORMING"
 	EventTypeFleaTreatment   EventType = "FLEA_TREATMENT"
 	EventTypeBath            EventType = "BATH"

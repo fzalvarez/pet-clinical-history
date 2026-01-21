@@ -1,0 +1,915 @@
+basePath: /
+definitions:
+  accessgrants.Scope:
+    enum:
+    - pet:read
+    - pet:edit_profile
+    - events:read
+    - events:create
+    - events:void
+    - attachments:add
+    type: string
+    x-enum-varnames:
+    - ScopePetRead
+    - ScopePetEditProfile
+    - ScopeEventsRead
+    - ScopeEventsCreate
+    - ScopeEventsVoid
+    - ScopeAttachmentsAdd
+  accessgrants.Status:
+    enum:
+    - invited
+    - active
+    - revoked
+    type: string
+    x-enum-varnames:
+    - StatusInvited
+    - StatusActive
+    - StatusRevoked
+  accessgrants.grantResponse:
+    properties:
+      created_at:
+        type: string
+      grantee_user_id:
+        type: string
+      id:
+        type: string
+      owner_user_id:
+        type: string
+      pet_id:
+        type: string
+      revoked_at:
+        type: string
+      scopes:
+        items:
+          $ref: '#/definitions/accessgrants.Scope'
+        type: array
+      status:
+        $ref: '#/definitions/accessgrants.Status'
+      updated_at:
+        type: string
+    type: object
+  accessgrants.inviteGrantRequest:
+    properties:
+      grantee_user_id:
+        type: string
+      scopes:
+        items:
+          $ref: '#/definitions/accessgrants.Scope'
+        type: array
+    type: object
+  events.ActorType:
+    enum:
+    - OWNER_USER
+    - DELEGATE_USER
+    - EXTERNAL_SYSTEM
+    type: string
+    x-enum-varnames:
+    - ActorTypeOwnerUser
+    - ActorTypeDelegateUser
+    - ActorTypeExternalSystem
+  events.EventStatus:
+    enum:
+    - active
+    - voided
+    type: string
+    x-enum-varnames:
+    - EventStatusActive
+    - EventStatusVoided
+  events.EventType:
+    enum:
+    - PROFILE_UPDATED
+    - WEIGHT_RECORDED
+    - NOTE
+    - MEDICAL_VISIT
+    - MEDICATION_PRESCRIBED
+    - VACCINE
+    - DEWORMING
+    - FLEA_TREATMENT
+    - BATH
+    - ATTACHMENT_ADDED
+    type: string
+    x-enum-varnames:
+    - EventTypeProfileUpdated
+    - EventTypeWeightRecorded
+    - EventTypeNote
+    - EventTypeMedicalVisit
+    - EventTypeMedicationPresc
+    - EventTypeVaccine
+    - EventTypeDeworming
+    - EventTypeFleaTreatment
+    - EventTypeBath
+    - EventTypeAttachmentAdded
+  events.Source:
+    enum:
+    - manual
+    - smartpet
+    - integration
+    type: string
+    x-enum-varnames:
+    - SourceManual
+    - SourceSmartPet
+    - SourceIntegration
+  events.Visibility:
+    enum:
+    - private
+    - shared_with_delegates
+    type: string
+    x-enum-varnames:
+    - VisibilityPrivate
+    - VisibilityShared
+  events.createEventRequest:
+    properties:
+      notes:
+        type: string
+      occurred_at:
+        description: RFC3339
+        type: string
+      source:
+        allOf:
+        - $ref: '#/definitions/events.Source'
+        description: opcional
+      title:
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/events.EventType'
+        enum:
+        - NOTE
+        - MEDICAL_VISIT
+        - VACCINE
+        - DEWORMING
+        - BATH
+        - PROFILE_UPDATED
+        - WEIGHT_RECORDED
+        - MEDICATION_PRESCRIBED
+        - FLEA_TREATMENT
+        - ATTACHMENT_ADDED
+      visibility:
+        allOf:
+        - $ref: '#/definitions/events.Visibility'
+        description: opcional
+    type: object
+  events.eventResponse:
+    properties:
+      actor_id:
+        type: string
+      actor_type:
+        $ref: '#/definitions/events.ActorType'
+      id:
+        type: string
+      notes:
+        type: string
+      occurred_at:
+        type: string
+      pet_id:
+        type: string
+      recorded_at:
+        type: string
+      source:
+        $ref: '#/definitions/events.Source'
+      status:
+        $ref: '#/definitions/events.EventStatus'
+      title:
+        type: string
+      type:
+        $ref: '#/definitions/events.EventType'
+      visibility:
+        $ref: '#/definitions/events.Visibility'
+    type: object
+  pets.Sex:
+    enum:
+    - male
+    - female
+    - unknown
+    type: string
+    x-enum-varnames:
+    - SexMale
+    - SexFemale
+    - SexUnknown
+  pets.Species:
+    enum:
+    - dog
+    - cat
+    type: string
+    x-enum-varnames:
+    - SpeciesDog
+    - SpeciesCat
+  pets.createPetRequest:
+    properties:
+      birth_date:
+        description: YYYY-MM-DD opcional
+        type: string
+      breed:
+        description: 'Ej para dog: labrador, poodle. Ej para cat: persian, common.'
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      sex:
+        allOf:
+        - $ref: '#/definitions/pets.Sex'
+        enum:
+        - male
+        - female
+        - unknown
+      species:
+        allOf:
+        - $ref: '#/definitions/pets.Species'
+        description: dog, cat
+        enum:
+        - dog
+        - cat
+    type: object
+  pets.grantMini:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/accessgrants.Status'
+    type: object
+  pets.petResponse:
+    properties:
+      birth_date:
+        type: string
+      breed:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      owner_user_id:
+        type: string
+      sex:
+        $ref: '#/definitions/pets.Sex'
+      species:
+        $ref: '#/definitions/pets.Species'
+      updated_at:
+        type: string
+    type: object
+  pets.sharedPetResponse:
+    properties:
+      grant:
+        $ref: '#/definitions/pets.grantMini'
+      pet:
+        $ref: '#/definitions/pets.petResponse'
+      scopes:
+        items:
+          $ref: '#/definitions/accessgrants.Scope'
+        type: array
+    type: object
+  pets.updatePetRequest:
+    properties:
+      breed:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      sex:
+        allOf:
+        - $ref: '#/definitions/pets.Sex'
+        enum:
+        - male
+        - female
+        - unknown
+      species:
+        allOf:
+        - $ref: '#/definitions/pets.Species'
+        enum:
+        - dog
+        - cat
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@odyssoft.com
+    name: API Support
+    url: https://odyssoft.com/support
+  description: API REST para gestión de historiales clínicos de mascotas con sistema
+    de delegación de acceso.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Pet Clinical History API
+  version: "1.0"
+paths:
+  /grants/{grantID}/accept:
+    post:
+      consumes:
+      - application/json
+      description: 'Acepta una invitación pendiente para que el usuario autenticado
+        se convierta en delegado de una mascota. Solo el grantee puede aceptar su
+        invitación. Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer
+        <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID del grant a aceptar
+        in: path
+        name: grantID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accessgrants.grantResponse'
+        "400":
+          description: invalid input
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+        "409":
+          description: 'bad state para aceptar (ej: ya aceptado/revocado)'
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Aceptar una invitación de grant
+      tags:
+      - accessgrants
+  /grants/{grantID}/revoke:
+    post:
+      consumes:
+      - application/json
+      description: 'Revoca un grant existente. Puede ser ejecutado por el owner o,
+        según la lógica de negocio, por el delegado cuando corresponda. Autenticación:
+        `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID del grant a revocar
+        in: path
+        name: grantID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accessgrants.grantResponse'
+        "400":
+          description: invalid input
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Revocar un grant
+      tags:
+      - accessgrants
+  /me/grants:
+    get:
+      consumes:
+      - application/json
+      description: 'Lista los grants donde el usuario autenticado es el delegado (grantee).
+        Opcionalmente filtra por estado mediante `status=invited,active`. Autenticación:
+        `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: 'Lista CSV de estados permitidos (ej: invited,active)'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accessgrants.grantResponse'
+            type: array
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Listar mis grants como delegado
+      tags:
+      - accessgrants
+  /me/pets:
+    get:
+      description: 'Lista las mascotas compartidas con el usuario autenticado mediante
+        grants activos que incluyan el scope `pet:read`. Autenticación: `X-Debug-User-ID`
+        (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pets.sharedPetResponse'
+            type: array
+      summary: Listar mascotas compartidas conmigo
+      tags:
+      - pets
+  /pets:
+    get:
+      description: 'Lista todas las mascotas cuyo propietario es el usuario autenticado.
+        Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+        Solo el owner ve este listado; los delegados no listan aquí.'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pets.petResponse'
+            type: array
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+      summary: Listar mis mascotas
+      tags:
+      - pets
+    post:
+      consumes:
+      - application/json
+      description: 'Crea una mascota. Species: `dog`, `cat`. Breeds Perro: `labrador`,
+        `golden_retriever`, `poodle`, etc. Breeds Gato: `persian`, `common`, etc.'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: Datos de la mascota; birth_date opcional (YYYY-MM-DD)
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/pets.createPetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/pets.petResponse'
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+      summary: Crear una mascota
+      tags:
+      - pets
+  /pets/{petID}:
+    get:
+      description: 'Obtiene el perfil de una mascota. El dueño siempre tiene acceso
+        (bypass). Un delegado necesita un grant activo con scope `pet:read`. Autenticación:
+        `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pets.petResponse'
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: pet not found
+          schema:
+            type: string
+      summary: Obtener perfil de mascota
+      tags:
+      - pets
+    patch:
+      consumes:
+      - application/json
+      description: 'Actualiza parcialmente el perfil de una mascota. El dueño siempre
+        tiene acceso (bypass). Un delegado necesita un grant activo con scope `pet:edit_profile`.
+        Autenticación: `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).
+        Campo `birth_date` se maneja con semántica PATCH especial: si no se envía,
+        no cambia; si se envía como `null`, se limpia; si se envía como string `YYYY-MM-DD`,
+        se actualiza.'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      - description: Campos a actualizar
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/pets.updatePetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pets.petResponse'
+        "403":
+          description: forbidden
+          schema:
+            type: string
+      summary: Actualizar perfil de mascota
+      tags:
+      - pets
+  /pets/{petID}/events:
+    get:
+      consumes:
+      - application/json
+      description: 'Lista los eventos clínicos de una mascota. El dueño siempre puede
+        verlos. Un delegado necesita un grant activo con scope `events:read`. Autenticación:
+        `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod). Permite
+        filtrar por tipos, rango de fechas y texto.'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      - description: Máximo de eventos a devolver (1-200). Por defecto 50
+        in: query
+        name: limit
+        type: integer
+      - description: 'Lista CSV de tipos de evento a incluir (ej: MEDICAL_VISIT,BATH)'
+        in: query
+        name: types
+        type: string
+      - description: Fecha/hora mínima occurred_at (RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: Fecha/hora máxima occurred_at (RFC3339)
+        in: query
+        name: to
+        type: string
+      - description: Texto de búsqueda libre en título/notas
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/events.eventResponse'
+            type: array
+        "400":
+          description: Parámetros de filtro inválidos
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: pet not found
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Listar eventos de una mascota
+      tags:
+      - events
+    post:
+      consumes:
+      - application/json
+      description: 'Crea un nuevo evento clínico para la mascota indicada. El dueño
+        siempre puede crear eventos. Un delegado necesita un grant activo con scope
+        `events:create`. Autenticación: `X-Debug-User-ID` (dev) o `Authorization:
+        Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      - description: Datos del evento; occurred_at en formato RFC3339
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/events.createEventRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/events.eventResponse'
+        "400":
+          description: invalid json / occurred_at inválido / reglas de negocio
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: pet not found
+          schema:
+            type: string
+      summary: Crear evento de mascota
+      tags:
+      - events
+  /pets/{petID}/events/{eventID}/void:
+    post:
+      consumes:
+      - application/json
+      description: 'Anula un evento existente de la mascota. El dueño siempre puede
+        anular. Un delegado necesita un grant activo con scope `events:void`. Autenticación:
+        `X-Debug-User-ID` (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      - description: ID del evento
+        in: path
+        name: eventID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/events.eventResponse'
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: event not found
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Anular (void) un evento
+      tags:
+      - events
+  /pets/{petID}/grants:
+    get:
+      consumes:
+      - application/json
+      description: 'Lista todos los grants asociados a una mascota. Solo el owner
+        de la mascota puede verlos. Autenticación: `X-Debug-User-ID` (dev) o `Authorization:
+        Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota
+        in: path
+        name: petID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accessgrants.grantResponse'
+            type: array
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: pet not found
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Listar grants por mascota
+      tags:
+      - accessgrants
+    post:
+      consumes:
+      - application/json
+      description: 'Crea una invitación (grant) para que otro usuario acceda a la
+        mascota. Solo el owner de la mascota puede invitar. Autenticación: `X-Debug-User-ID`
+        (dev) o `Authorization: Bearer <token>` (prod).'
+      parameters:
+      - description: Solo en modo dev, ID de usuario para depuración
+        in: header
+        name: X-Debug-User-ID
+        type: string
+      - description: Bearer token en producción
+        in: header
+        name: Authorization
+        type: string
+      - description: ID de la mascota compartida
+        in: path
+        name: petID
+        required: true
+        type: string
+      - description: Datos de la invitación (usuario delegado y scopes otorgados)
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/accessgrants.inviteGrantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/accessgrants.grantResponse'
+        "400":
+          description: invalid json / invalid input / grantee_user_id requerido
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: pet not found
+          schema:
+            type: string
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Invitar delegado a una mascota
+      tags:
+      - accessgrants
+securityDefinitions:
+  BearerAuth:
+    description: 'Token JWT obtenido de Odin-IAM. Formato: `Bearer <token>`'
+    in: header
+    name: Authorization
+    type: apiKey
+  DebugUserID:
+    description: Solo en modo dev. Permite simular autenticación sin token real.
+    in: header
+    name: X-Debug-User-ID
+    type: apiKey
+swagger: "2.0"

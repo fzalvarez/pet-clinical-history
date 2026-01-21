@@ -10,7 +10,34 @@ import (
 	"time"
 
 	"pet-clinical-history/internal/router"
+
+	_ "pet-clinical-history/docs" // importa docs generados por swag
 )
+
+// @title Pet Clinical History API
+// @version 1.0
+// @description API REST para gestión de historiales clínicos de mascotas con sistema de delegación de acceso.
+// @termsOfService http://swagger.io/terms/
+//
+// @contact.name API Support
+// @contact.url https://odyssoft.com/support
+// @contact.email support@odyssoft.com
+//
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+//
+// @host localhost:8080
+// @BasePath /
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Token JWT obtenido de Odin-IAM. Formato: `Bearer <token>`
+//
+// @securityDefinitions.apikey DebugUserID
+// @in header
+// @name X-Debug-User-ID
+// @description Solo en modo dev. Permite simular autenticación sin token real.
 
 func main() {
 	addr := ":8080"
